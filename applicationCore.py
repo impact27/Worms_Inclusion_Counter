@@ -12,10 +12,12 @@ import matplotlib.image as mpimg
 from wormInclusions import (bgThreshold, Scharr_edge,
                             writeSummary, saveInclusions)
 import numpy as np
-from PyQt5 import QtWidgets
 from glob import glob
 import cv2
 from matplotlib.path import Path
+from tkinter.messagebox import showinfo, showerror
+import tkinter as tk
+import os
 
 
 def getvals(bins, data):
@@ -46,12 +48,8 @@ class applicationCore():
     def loadImage(self, fn):
         im = mpimg.imread(fn)
         if len(im.shape) > 2:
-            error = QtWidgets.QMessageBox()
-            error.critical(self.imageCanvas,
-                           "Error",
-                           "An invalid image is present."
-                           " Please don't use images stacks or RGB images.")
-            error.setFixedSize(500, 200)
+            showerror("Error", "An invalid image is present."
+                      " Please don't use images stacks or RGB images.")
             return
         self.fn = fn
         self.setimage(im)
@@ -144,7 +142,7 @@ class applicationCore():
             self.updateThreshold(self.threshold)
 
     def onOpenFile(self):
-        fn = QtWidgets.QFileDialog.getExistingDirectory()
+        fn = tk.filedialog.askdirectory(initialdir=os.getcwd())
         if fn is not None and fn != '':
             self.loadFolder(fn)
 
@@ -254,6 +252,4 @@ class applicationCore():
                      self.fns, self.skipped)
         for i in range(self.i, len(self.fns)):
             self.skipped.append(i)
-        msgBox = QtWidgets.QMessageBox()
-        msgBox.setText('Done!')
-        msgBox.exec_()
+        showinfo('Done!', 'Done!')

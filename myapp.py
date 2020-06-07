@@ -10,21 +10,18 @@ https://creativecommons.org/licenses/by-nc-sa/4.0/.
 """
 
 import matplotlib
-matplotlib.use('Qt5Agg')
-
+matplotlib.use('TkAgg')
 
 import os
 import sys
-from PyQt5 import QtCore, QtWidgets, QtGui
+import tkinter as tk
 import numpy as np
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from applicationCore import applicationCore
 from matplotlib.patches import Rectangle
 from matplotlib.widgets import LassoSelector
-
-
 
 progname = os.path.basename(sys.argv[0])
 progversion = "0.1"
@@ -33,19 +30,12 @@ progversion = "0.1"
 class MyMplCanvas(FigureCanvas):
     """Ultimately, this is a QWidget (as well as a FigureCanvasAgg, etc.)."""
 
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
+    def __init__(self, master, width=5, height=4, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
-
         self.compute_initial_figure()
 
-        FigureCanvas.__init__(self, fig)
-        self.setParent(parent)
-
-        FigureCanvas.setSizePolicy(self,
-                                   QtWidgets.QSizePolicy.Expanding,
-                                   QtWidgets.QSizePolicy.Expanding)
-        FigureCanvas.updateGeometry(self)
+        FigureCanvas.__init__(self, fig, master)
 
     def compute_initial_figure(self):
         pass
@@ -57,15 +47,14 @@ class imageCanvas(MyMplCanvas):
         self.axes = self.figure.add_subplot(111)
         self.cbar = None
 
-
     def createLasso(self, onLassoSelect):
         self.lasso = LassoSelector(self.axes, onLassoSelect,
                                    lineprops=dict(color='w'))
 
     def setimage(self, im):
         self.im = im
-#        if hasattr(self, 'ROIrect'):
-#            del self.ROIrect
+        # if hasattr(self, 'ROIrect'):
+        #     del self.ROIrect
         self.update_figure()
 
     def update_figure(self):
@@ -76,9 +65,9 @@ class imageCanvas(MyMplCanvas):
             self.cbar.mappable = mp
         else:
             self.cbar = self.figure.colorbar(mp)
-#        if hasattr(self, 'ROIrect'):
-#
-#            self.axes.add_patch(self.ROIrect)
+        # if hasattr(self, 'ROIrect'):
+
+        #     self.axes.add_patch(self.ROIrect)
         self.draw()
 
     def standalone(self):
@@ -89,7 +78,7 @@ class imageCanvas(MyMplCanvas):
             plt.show()
 
     def addRectangle(self, X, W, H):
-#        self.ROIrect = Rectangle(X, W, H, facecolor='none', edgecolor='white')
+        # self.ROIrect = Rectangle(X, W, H, facecolor='none',edgecolor='white')
         self.update_figure()
 
 
@@ -159,32 +148,26 @@ class thresholdCanvas(MyMplCanvas):
         self.update_figure()
 
 
-class ApplicationWindow(QtWidgets.QMainWindow):
-    def __init__(self):
+class ApplicationWindow():
+    def __init__(self, root):
+        self.main_window = root
 
-        # Init everything
-        QtWidgets.QMainWindow.__init__(self)
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.setWindowTitle("application main window")
-
-        # create menu
-        self.file_menu = QtWidgets.QMenu('&File', self)
-        self.file_menu.addAction('&Quit', self.fileQuit,
-                                 QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
-        self.menuBar().addMenu(self.file_menu)
-
-        self.help_menu = QtWidgets.QMenu('&Help', self)
-        self.menuBar().addSeparator()
-        self.menuBar().addMenu(self.help_menu)
-
-        self.help_menu.addAction('&About', self.about)
-
-        self.statusBar().showMessage("Hello", 2000)
+        top_frame = tk.Frame(root)
+        top_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        bottom_frame = tk.Frame(root)
+        bottom_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=1)
 
         # Create canevas
-        self.imageCanvas = imageCanvas()
-        self.thresholdCanvas = thresholdCanvas()
-        self.inclusionCanvas = inclusionCanvas()
+        self.imageCanvas = imageCanvas(master=top_frame)
+        self.inclusionCanvas = inclusionCanvas(master=top_frame)
+        self.thresholdCanvas = thresholdCanvas(master=bottom_frame)
+
+        self.imageCanvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+        self.inclusionCanvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+        self.thresholdCanvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+
+        buttons_frame = tk.Frame(bottom_frame)
+        buttons_frame.pack(side=tk.RIGHT, padx=10)
 
         # create appication core
         self.applicationCore = applicationCore(self.imageCanvas,
@@ -192,38 +175,46 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                                self.thresholdCanvas)
 
         # Create Buttons
-        logbutton = QtWidgets.QPushButton('Threshold xlog')
-        logbutton.setCheckable(True)
+        self.is_threshold_log = tk.IntVar()
+        logbutton = tk.Checkbutton(buttons_frame, text='Threshold xlog',
+                                   variable=self.is_threshold_log,
+                                   command=self.onXLog)
+        self.is_intensity_threshold = tk.IntVar()
+        thresTypebutton = tk.Checkbutton(buttons_frame, text='Intensity threshold',
+                                         variable=self.is_intensity_threshold,
+                                         command=self.onThreshType)
+        self.is_show_gradient = tk.IntVar()
+        gradbutton = tk.Checkbutton(buttons_frame, text='Show gradient',
+                                    variable=self.is_show_gradient,
+                                    command=self.onImageDisplay)
+        self.is_edit_worm = tk.IntVar()
+        bgbutton = tk.Checkbutton(buttons_frame, text='Edit worm',
+                                  variable=self.is_edit_worm,
+                                  command=self.onEditWorm)
+        openButton = tk.Button(
+            buttons_frame, text='Load Folder',
+            command=self.applicationCore.onOpenFile)
+        nextButton = tk.Button(
+            buttons_frame, text='Save/Next',
+            command=self.applicationCore.onNext)
+        sameButton = tk.Button(
+            buttons_frame, text='Save/Same',
+            command=self.applicationCore.onSame)
+        skipButton = tk.Button(
+            buttons_frame, text='Skip',
+            command=self.applicationCore.onSkip)
+        endButton = tk.Button(
+            buttons_frame, text='End',
+            command=self.applicationCore.onEnd)
+        ResetROIButton = tk.Button(
+            buttons_frame, text='Reset ROI',
+            command=self.applicationCore.onROIReset)
 
-        thresTypebutton = QtWidgets.QPushButton('Intensity threshold')
-        thresTypebutton.setCheckable(True)
-
-        gradbutton = QtWidgets.QPushButton('Show gradient')
-        gradbutton.setCheckable(True)
-
-        bgbutton = QtWidgets.QPushButton('Edit worm')
-        bgbutton.setCheckable(True)
-
-        openButton = QtWidgets.QPushButton('Load Folder')
-        nextButton = QtWidgets.QPushButton('Save/Next')
-        sameButton = QtWidgets.QPushButton('Save/Same')
-        skipButton = QtWidgets.QPushButton('Skip')
-        endButton = QtWidgets.QPushButton('End')
-
-        ResetROIButton = QtWidgets.QPushButton('Reset ROI')
-
-        scaleLine = QtWidgets.QLineEdit()
-        scaleLine.setValidator(QtGui.QDoubleValidator(0, 100, 3))
-        scaleLine.setMaximumWidth(100)
-        scaleLine.setText('1')
+        scaleLine = tk.Entry(buttons_frame)
+        scaleLine.insert(0, '1')
         # add method to applicationCore
-        self.applicationCore.iseditingbg = bgbutton.isChecked
-        self.applicationCore.getRatioText = scaleLine.text
-
-        # Create main widget
-        self.main_widget = QtWidgets.QWidget(self)
-        self.main_widget.setFocus()
-        self.setCentralWidget(self.main_widget)
+        self.applicationCore.iseditingbg = self.is_edit_worm.get
+        self.applicationCore.getRatioText = scaleLine.get
 
         # Connections
         self.thresholdCanvas.mpl_connect('button_press_event',
@@ -236,63 +227,35 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 #                                     self.applicationCore.onImageRelease)
         self.inclusionCanvas.mpl_connect('button_press_event',
                                          self.inclusionCanvas.standalone)
-        bgbutton.clicked.connect(self.applicationCore.onEditWorm)
-        gradbutton.clicked.connect(self.applicationCore.onImageDisplay)
-        thresTypebutton.clicked.connect(self.applicationCore.onThreshType)
-        logbutton.clicked.connect(self.thresholdCanvas.onXLog)
-        openButton.clicked.connect(self.applicationCore.onOpenFile)
-        nextButton.clicked.connect(self.applicationCore.onNext)
-        sameButton.clicked.connect(self.applicationCore.onSame)
-        ResetROIButton.clicked.connect(self.applicationCore.onROIReset)
-        skipButton.clicked.connect(self.applicationCore.onSkip)
-        endButton.clicked.connect(self.applicationCore.onEnd)
 
-        # Layout
-        vert = QtWidgets.QVBoxLayout(self.main_widget)
-        h0 = QtWidgets.QHBoxLayout()
-        h1 = QtWidgets.QHBoxLayout()
-
-        h0.addWidget(self.imageCanvas)
-        h0.addWidget(self.inclusionCanvas)
-        h1.addWidget(self.thresholdCanvas)
-
-        vButton = QtWidgets.QVBoxLayout()
-        vButton.addWidget(thresTypebutton)
-        vButton.addWidget(logbutton)
-        vButton.addWidget(gradbutton)
-        vButton.addWidget(bgbutton)
-        vButton.addWidget(openButton)
-        vButton.addWidget(nextButton)
-        vButton.addWidget(sameButton)
-        vButton.addWidget(ResetROIButton)
-        vButton.addWidget(scaleLine)
-        vButton.addWidget(skipButton)
-        vButton.addWidget(endButton)
-
-        h1.addLayout(vButton)
-
-        vert.addLayout(h0)
-        vert.addLayout(h1)
-
-        self.activateWindow()
-        self.setFocus()
+        thresTypebutton.pack(fill=tk.X)
+        logbutton.pack(fill=tk.X)
+        gradbutton.pack(fill=tk.X)
+        bgbutton.pack(fill=tk.X)
+        openButton.pack(fill=tk.X)
+        nextButton.pack(fill=tk.X)
+        sameButton.pack(fill=tk.X)
+        ResetROIButton.pack(fill=tk.X)
+        scaleLine.pack(fill=tk.X)
+        skipButton.pack(fill=tk.X)
+        endButton.pack(fill=tk.X)
 
         self.applicationCore.onOpenFile()
 
-    def fileQuit(self):
-        self.close()
+    def onThreshType(self):
+        self.applicationCore.onThreshType(self.is_intensity_threshold.get())
 
-    def closeEvent(self, ce):
-        self.fileQuit()
+    def onImageDisplay(self):
+        self.applicationCore.onImageDisplay(self.is_show_gradient.get())
 
-    def about(self):
-        QtWidgets.QMessageBox.about(self, "About",
-                                    """hello""")
+    def onEditWorm(self):
+        self.applicationCore.onEditWorm(self.is_edit_worm.get())
 
+    def onXLog(self):
+        self.thresholdCanvas.onXLog(self.is_threshold_log.get())
 
-qApp = QtWidgets.QApplication(sys.argv)
-
-aw = ApplicationWindow()
-aw.setWindowTitle("%s" % progname)
-aw.show()
-sys.exit(qApp.exec_())
+if __name__ == "__main__":
+    root = tk.Tk()
+    window = ApplicationWindow(root)
+    root.title("%s" % progname)
+    root.mainloop()
